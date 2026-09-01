@@ -151,16 +151,8 @@ Desktop.ini
 # Linux
 .Trash-*
 
-# Model files (keep if you want to version them, remove if not)
-models/*.pkl
-models/*.joblib
-models/*.pth
-models/*.h5
-
-# Data files (keep local, don't push large datasets)
+# Data files - only ignore raw data
 data/raw/
-data/processed/
-data/features/
 
 # Temporary files
 *.tmp
@@ -172,3 +164,6 @@ data/features/
 # Project specific
 .streamlit/
 streamlit_run.log
+
+# Large unused model
+models/random_forest_72h.pkl
