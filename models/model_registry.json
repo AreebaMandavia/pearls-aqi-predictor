@@ -1,0 +1,17 @@
+{
+    "model_name": "Karachi_AQI_XGBoost_72H",
+    "version": "1.0.0",
+    "framework": "XGBoost",
+    "model_type": "XGBoost 72-Hour Forecasting",
+    "model_file": "models/xgboost_72h.pkl",
+    "feature_version": "karachi_features_v2",
+    "feature_store": "data/feature_store/karachi_feature_store.parquet",
+    "forecast_horizon_hours": 72,
+    "status": "production",
+    "training_date": "2026-09-01",
+    "metrics": {
+        "average_mae": 8.5078,
+        "average_rmse": 10.7208,
+        "average_r2": 0.0195
+    }
+}
