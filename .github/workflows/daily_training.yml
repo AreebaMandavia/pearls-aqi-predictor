@@ -1,0 +1,38 @@
+name: Daily AQI Model Training
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+
+  workflow_dispatch:
+
+jobs:
+  train-model:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate features
+        run: |
+          python src/features/feature_engineering.py
+
+      - name: Train XGBoost
+        run: |
+          python src/models/train_xgboost_72h.py
+
+      - name: Run SHAP analysis
+        run: |
+          python src/models/explain_model.py
