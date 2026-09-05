@@ -1,18 +1,16 @@
-  name: Populate Hopsworks Feature Store
+name: Populate Hopsworks Feature Store
 
 on:
   workflow_dispatch:
 
 jobs:
   populate-feature-store:
-
     runs-on: ubuntu-latest
 
     env:
       HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
 
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -23,8 +21,9 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Populate Hopsworks Feature Group
         run: |
-          python src/features/populate_hopsworks.py 
+          python src/features/populate_hopsworks.py
