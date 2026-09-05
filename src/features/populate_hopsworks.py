@@ -2,6 +2,7 @@ import os
 import platform
 import pandas as pd
 import hopsworks
+from hopsworks_common.core.job_configuration import JobConfiguration
 
 PROJECT_NAME = "areeba_aqi_predictor"
 FEATURE_GROUP_NAME = "karachi_aqi_features"
@@ -52,10 +53,23 @@ print("Version:", fg.version)
 
 print("\nUploading historical data...")
 
+job_config = JobConfiguration(
+    driver_memory=2048,
+    driver_cores=1,
+    executor_memory=4096,
+    executor_cores=1,
+    executor_instances=1,
+    dynamic_allocation=True,
+    dynamic_min_executors=1,
+    dynamic_max_executors=2,
+    environment_name="spark-feature-pipeline",
+)
+
 fg.insert(
     df,
     write_options={
-        "wait_for_job": True
+        "spark": job_config,
+        "wait_for_job": True,
     }
 )
 
