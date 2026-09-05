@@ -1,4 +1,5 @@
 import os
+import platform
 import pandas as pd
 import hopsworks
 
@@ -23,11 +24,19 @@ print("Date range:", df["timestamp"].min(), "->", df["timestamp"].max())
 
 print("\nConnecting to Hopsworks...")
 
-project = hopsworks.login(
-    project=PROJECT_NAME,
-    api_key_value=os.environ["HOPSWORKS_API_KEY"],
-    engine="python"
-)
+login_kwargs = {
+    "project": PROJECT_NAME,
+    "api_key_value": os.environ["HOPSWORKS_API_KEY"],
+    "engine": "python",
+}
+
+# Hopsworks 5.0.6 on Windows needs an explicit certificate folder.
+if platform.system() == "Windows":
+    cert_folder = os.path.abspath(".hopsworks")
+    os.makedirs(cert_folder, exist_ok=True)
+    login_kwargs["cert_folder"] = cert_folder
+
+project = hopsworks.login(**login_kwargs)
 
 print("Connected to:", project.name)
 
@@ -45,7 +54,6 @@ print("\nUploading historical data...")
 
 fg.insert(
     df,
-    overwrite=True,
     write_options={
         "wait_for_job": True
     }
