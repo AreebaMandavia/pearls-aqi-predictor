@@ -3,13 +3,20 @@ name: Daily AQI Model Training
 on:
   schedule:
     - cron: "0 2 * * *"
+
   workflow_dispatch:
 
 jobs:
   train-model:
+
     runs-on: ubuntu-latest
 
+    env:
+      HOPSWORKS_PROJECT: areeba_aqi_predictor
+      HOPSWORKS_API_KEY: ${{ secrets.HOPSWORKS_API_KEY }}
+
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -20,15 +27,20 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Verify Hopsworks
+        run: |
+          python -c "import hopsworks; print('Hopsworks:', hopsworks.__version__)"
 
       - name: Generate features
         run: |
           python src/features/feature_engineering.py
 
-      - name: Train XGBoost
+      - name: Train from Hopsworks Feature View
         run: |
-          python src/models/train_xgboost_72hr.py
+          python src/models/train_xgboost_hopsworks_72h.py
 
       - name: Run SHAP analysis
         run: |
