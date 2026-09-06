@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import joblib
 import matplotlib.pyplot as plt
+import shap
 
 
 # ============================================================
@@ -40,36 +41,12 @@ def load_model():
 
 
 df = load_data()
-
 model = load_model()
 
 
 # ============================================================
-# HEADER
+# AQI CATEGORY
 # ============================================================
-
-st.title(
-    "🌍 Pearls AQI Predictor"
-)
-
-st.subheader(
-    "Karachi Air Quality — 72 Hour Forecast"
-)
-
-st.write(
-    "Machine-learning based AQI prediction using "
-    "historical air-quality, weather and temporal features."
-)
-
-
-# ============================================================
-# CURRENT AQI
-# ============================================================
-
-latest = df.iloc[-1]
-
-current_aqi = latest["aqi"]
-
 
 def get_category(aqi):
 
@@ -91,13 +68,38 @@ def get_category(aqi):
     return "Hazardous"
 
 
-category = get_category(
-    current_aqi
+# ============================================================
+# HEADER
+# ============================================================
+
+st.title("🌍 Pearls AQI Predictor")
+
+st.subheader(
+    "Karachi Air Quality — 3 Day Forecast"
+)
+
+st.write(
+    "Machine-learning based AQI prediction using "
+    "historical air-quality, weather and temporal features."
 )
 
 
-col1, col2, col3, col4 = st.columns(4)
+# ============================================================
+# CURRENT READING
+# ============================================================
 
+st.divider()
+
+st.header("📍 Current Reading")
+
+latest = df.iloc[-1]
+
+current_aqi = float(latest["aqi"])
+
+category = get_category(current_aqi)
+
+
+col1, col2, col3, col4 = st.columns(4)
 
 col1.metric(
     "Current AQI",
@@ -119,17 +121,14 @@ col4.metric(
     f"{latest['temperature']:.1f} °C"
 )
 
-
-# ============================================================
-# FORECAST
-# ============================================================
-
-st.divider()
-
-st.header(
-    "72-Hour AQI Forecast"
+st.caption(
+    f"Latest reading: {latest['timestamp']}"
 )
 
+
+# ============================================================
+# PREPARE MODEL INPUT
+# ============================================================
 
 target_columns = [
     f"target_aqi_t_plus_{i}"
@@ -142,20 +141,24 @@ feature_columns = [
     and c not in target_columns
 ]
 
-
 X_latest = df[
     feature_columns
 ].iloc[[-1]]
 
 
+# ============================================================
+# 72-HOUR PREDICTION
+# ============================================================
+
 prediction = model.predict(
     X_latest
 )[0]
 
+prediction = np.asarray(prediction).flatten()
+
 
 forecast_times = pd.date_range(
-    start=latest["timestamp"]
-        + pd.Timedelta(hours=1),
+    start=latest["timestamp"] + pd.Timedelta(hours=1),
     periods=72,
     freq="h"
 )
@@ -168,76 +171,160 @@ forecast_df = pd.DataFrame({
 
 
 # ============================================================
-# CHART
+# 3 DAY FORECAST
 # ============================================================
 
-fig, ax = plt.subplots()
+st.divider()
+
+st.header("📅 3-Day AQI Forecast")
+
+day1 = forecast_df.iloc[0:24]
+day2 = forecast_df.iloc[24:48]
+day3 = forecast_df.iloc[48:72]
+
+
+def day_summary(day):
+
+    return {
+        "avg": day["AQI"].mean(),
+        "max": day["AQI"].max(),
+        "min": day["AQI"].min()
+    }
+
+
+d1 = day_summary(day1)
+d2 = day_summary(day2)
+d3 = day_summary(day3)
+
+
+col1, col2, col3 = st.columns(3)
+
+
+with col1:
+
+    st.subheader("Day 1")
+
+    st.metric(
+        "Average AQI",
+        f"{d1['avg']:.0f}"
+    )
+
+    st.write(
+        f"Minimum: **{d1['min']:.0f}**"
+    )
+
+    st.write(
+        f"Maximum: **{d1['max']:.0f}**"
+    )
+
+    st.write(
+        f"Overall: **{get_category(d1['avg'])}**"
+    )
+
+
+with col2:
+
+    st.subheader("Day 2")
+
+    st.metric(
+        "Average AQI",
+        f"{d2['avg']:.0f}"
+    )
+
+    st.write(
+        f"Minimum: **{d2['min']:.0f}**"
+    )
+
+    st.write(
+        f"Maximum: **{d2['max']:.0f}**"
+    )
+
+    st.write(
+        f"Overall: **{get_category(d2['avg'])}**"
+    )
+
+
+with col3:
+
+    st.subheader("Day 3")
+
+    st.metric(
+        "Average AQI",
+        f"{d3['avg']:.0f}"
+    )
+
+    st.write(
+        f"Minimum: **{d3['min']:.0f}**"
+    )
+
+    st.write(
+        f"Maximum: **{d3['max']:.0f}**"
+    )
+
+    st.write(
+        f"Overall: **{get_category(d3['avg'])}**"
+    )
+
+
+# ============================================================
+# 72-HOUR GRAPH
+# ============================================================
+
+st.subheader("📈 Next 72 Hours")
+
+fig, ax = plt.subplots(figsize=(12, 5))
 
 ax.plot(
     forecast_df["timestamp"],
     forecast_df["AQI"]
 )
 
-ax.set_xlabel(
-    "Time"
-)
+ax.set_xlabel("Time")
+ax.set_ylabel("AQI")
+ax.set_title("Predicted AQI — Next 72 Hours")
 
-ax.set_ylabel(
-    "AQI"
-)
-
-ax.set_title(
-    "Predicted AQI — Next 72 Hours"
-)
-
-plt.xticks(
-    rotation=45
-)
-
+plt.xticks(rotation=45)
 plt.tight_layout()
 
 st.pyplot(fig)
 
 
 # ============================================================
-# TABLE
+# FORECAST TABLE
 # ============================================================
 
-st.subheader(
-    "Forecast Details"
-)
+with st.expander("View Detailed 72-Hour Forecast"):
 
-display_df = forecast_df.copy()
+    display_df = forecast_df.copy()
 
-display_df["Category"] = (
-    display_df["AQI"]
-    .apply(get_category)
-)
-
-display_df["timestamp"] = (
-    display_df["timestamp"]
-    .dt.strftime(
-        "%Y-%m-%d %H:%M"
+    display_df["Category"] = (
+        display_df["AQI"]
+        .apply(get_category)
     )
-)
 
-display_df["AQI"] = (
-    display_df["AQI"]
-    .round(1)
-)
+    display_df["timestamp"] = (
+        display_df["timestamp"]
+        .dt.strftime("%Y-%m-%d %H:%M")
+    )
 
-st.dataframe(
-    display_df,
-    use_container_width=True,
-    hide_index=True
-)
+    display_df["AQI"] = (
+        display_df["AQI"]
+        .round(1)
+    )
+
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True
+    )
 
 
 # ============================================================
-# ALERT
+# AQI ALERT
 # ============================================================
 
 max_aqi = forecast_df["AQI"].max()
+
 
 if max_aqi > 200:
 
@@ -269,33 +356,150 @@ else:
 
 
 # ============================================================
-# HISTORICAL DATA
+# SHAP EXPLAINABILITY
 # ============================================================
 
 st.divider()
 
-st.header(
-    "Recent AQI History"
+st.header("🔍 SHAP Explainability")
+
+st.write(
+    "SHAP shows which features are influencing the "
+    "next-hour AQI prediction."
 )
+
+try:
+
+    # Explain the XGBoost model
+    explainer = shap.TreeExplainer(model)
+
+    shap_values = explainer.shap_values(
+        X_latest
+    )
+
+    # Handle multi-output model
+    if isinstance(shap_values, list):
+
+        shap_values = shap_values[0]
+
+    shap_values = np.asarray(shap_values)
+
+    # If shape is (1, features, outputs)
+    if shap_values.ndim == 3:
+
+        shap_values = shap_values[:, :, 0]
+
+    # Get feature contributions
+    contributions = pd.DataFrame({
+        "Feature": feature_columns,
+        "SHAP Value": shap_values[0]
+    })
+
+    contributions["Impact"] = (
+        contributions["SHAP Value"]
+        .abs()
+    )
+
+    contributions = (
+        contributions
+        .sort_values(
+            "Impact",
+            ascending=False
+        )
+        .head(10)
+    )
+
+    # Display table
+    st.subheader("Top 10 Influencing Features")
+
+    shap_display = contributions[
+        ["Feature", "SHAP Value"]
+    ].copy()
+
+    shap_display["SHAP Value"] = (
+        shap_display["SHAP Value"]
+        .round(4)
+    )
+
+    st.dataframe(
+        shap_display,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # SHAP bar chart
+    st.subheader("Feature Impact")
+
+    fig3, ax3 = plt.subplots(
+        figsize=(10, 5)
+    )
+
+    plot_data = contributions.sort_values(
+        "SHAP Value"
+    )
+
+    ax3.barh(
+        plot_data["Feature"],
+        plot_data["SHAP Value"]
+    )
+
+    ax3.set_xlabel(
+        "SHAP Value"
+    )
+
+    ax3.set_ylabel(
+        "Feature"
+    )
+
+    ax3.set_title(
+        "Top Features Affecting Next-Hour AQI"
+    )
+
+    plt.tight_layout()
+
+    st.pyplot(fig3)
+
+    st.caption(
+        "Positive SHAP values increase the predicted AQI, "
+        "while negative values decrease it."
+    )
+
+
+except Exception as e:
+
+    st.warning(
+        "SHAP explanation could not be generated."
+    )
+
+    st.caption(
+        f"Reason: {str(e)}"
+    )
+
+
+# ============================================================
+# RECENT AQI HISTORY
+# ============================================================
+
+st.divider()
+
+st.header("📊 Recent AQI History")
 
 history = df[
     ["timestamp", "aqi"]
 ].tail(168)
 
-fig2, ax2 = plt.subplots()
+
+fig2, ax2 = plt.subplots(
+    figsize=(12, 5)
+)
 
 ax2.plot(
     history["timestamp"],
     history["aqi"]
 )
 
-ax2.set_xlabel(
-    "Time"
-)
-
-ax2.set_ylabel(
-    "AQI"
-)
+ax2.set_xlabel("Time")
+ax2.set_ylabel("AQI")
 
 ax2.set_title(
     "Last 7 Days"
