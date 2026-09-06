@@ -370,36 +370,64 @@ st.write(
 
 try:
 
-    # Explain the XGBoost model
-    explainer = shap.TreeExplainer(model)
+    # --------------------------------------------------------
+    # Get the underlying XGBoost model
+    # --------------------------------------------------------
+
+    if hasattr(model, "estimators_"):
+
+        # MultiOutputRegressor
+        xgb_model = model.estimators_[0]
+
+    else:
+
+        # Normal XGBoost model
+        xgb_model = model
+
+
+    # --------------------------------------------------------
+    # Create SHAP explainer
+    # --------------------------------------------------------
+
+    explainer = shap.TreeExplainer(
+        xgb_model
+    )
+
+
+    # --------------------------------------------------------
+    # Calculate SHAP values
+    # --------------------------------------------------------
 
     shap_values = explainer.shap_values(
         X_latest
     )
 
-    # Handle multi-output model
-    if isinstance(shap_values, list):
 
-        shap_values = shap_values[0]
+    shap_values = np.asarray(
+        shap_values
+    )
 
-    shap_values = np.asarray(shap_values)
 
-    # If shape is (1, features, outputs)
-    if shap_values.ndim == 3:
+    # --------------------------------------------------------
+    # Feature contributions
+    # --------------------------------------------------------
 
-        shap_values = shap_values[:, :, 0]
-
-    # Get feature contributions
     contributions = pd.DataFrame({
+
         "Feature": feature_columns,
+
         "SHAP Value": shap_values[0]
+
     })
+
 
     contributions["Impact"] = (
         contributions["SHAP Value"]
         .abs()
     )
 
+
+    # Top 10 features
     contributions = (
         contributions
         .sort_values(
@@ -409,17 +437,26 @@ try:
         .head(10)
     )
 
+
+    # --------------------------------------------------------
     # Display table
-    st.subheader("Top 10 Influencing Features")
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Top 10 Influencing Features"
+    )
+
 
     shap_display = contributions[
         ["Feature", "SHAP Value"]
     ].copy()
 
+
     shap_display["SHAP Value"] = (
         shap_display["SHAP Value"]
         .round(4)
     )
+
 
     st.dataframe(
         shap_display,
@@ -427,41 +464,62 @@ try:
         hide_index=True
     )
 
-    # SHAP bar chart
-    st.subheader("Feature Impact")
+
+    # --------------------------------------------------------
+    # SHAP BAR CHART
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Feature Impact on Next-Hour AQI"
+    )
+
+
+    plot_data = contributions.sort_values(
+        "SHAP Value"
+    )
+
 
     fig3, ax3 = plt.subplots(
         figsize=(10, 5)
     )
 
-    plot_data = contributions.sort_values(
-        "SHAP Value"
-    )
 
     ax3.barh(
         plot_data["Feature"],
         plot_data["SHAP Value"]
     )
 
+
+    ax3.axvline(
+        0,
+        linewidth=1
+    )
+
+
     ax3.set_xlabel(
         "SHAP Value"
     )
+
 
     ax3.set_ylabel(
         "Feature"
     )
 
+
     ax3.set_title(
         "Top Features Affecting Next-Hour AQI"
     )
 
+
     plt.tight_layout()
+
 
     st.pyplot(fig3)
 
+
     st.caption(
         "Positive SHAP values increase the predicted AQI, "
-        "while negative values decrease it."
+        "while negative SHAP values decrease it."
     )
 
 
@@ -474,6 +532,7 @@ except Exception as e:
     st.caption(
         f"Reason: {str(e)}"
     )
+
 
 
 # ============================================================
