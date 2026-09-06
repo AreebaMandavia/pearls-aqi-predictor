@@ -58,10 +58,41 @@ print("Feature View version:", fv.version)
 
 print("\nReading training data from Hopsworks...")
 
-features_df, labels_df = fv.training_data(
-    description="Karachi AQI XGBoost 72-hour training dataset"
+from hopsworks_common.core.job_configuration import JobConfiguration
+
+spark_job_config = JobConfiguration(
+    driver_memory=2048,
+    driver_cores=1,
+    executor_memory=4096,
+    executor_cores=1,
+    executor_instances=1,
+    dynamic_allocation=True,
+    dynamic_min_executors=1,
+    dynamic_max_executors=2,
+    environment_name="spark-feature-pipeline",
 )
 
+features_df, labels_df = fv.training_data(
+    description="Karachi AQI XGBoost 72-hour training dataset",
+    read_options={
+        "use_spark": True,
+        "spark": spark_job_config,
+        "wait_for_job": True,
+    }
+)
+training_dataset = fv.get_last_accessed_training_dataset()
+
+if training_dataset is None:
+    raise RuntimeError(
+        "Could not determine the Hopsworks training dataset version."
+    )
+
+training_dataset_version = training_dataset.version
+
+print(
+    "Hopsworks training dataset version:",
+    training_dataset_version
+)
 print("Features shape:", features_df.shape)
 print("Labels shape:", labels_df.shape)
 
@@ -206,6 +237,41 @@ os.makedirs("models", exist_ok=True)
 joblib.dump(model, MODEL_PATH)
 
 results_df.to_csv(RESULTS_PATH, index=False)
+
+# ---------------------------------------------------------
+# Register model in Hopsworks Model Registry
+# ---------------------------------------------------------
+
+print("\nRegistering model in Hopsworks...")
+
+mr = project.get_model_registry()
+
+hw_model = mr.sklearn.create_model(
+    name="aqi_xgboost_72h_hopsworks",
+    metrics={
+        "average_mae": float(average_mae),
+        "average_rmse": float(average_rmse),
+        "average_r2": float(average_r2),
+    },
+    description=(
+        "XGBoost MultiOutputRegressor for 72-hour Karachi AQI "
+        "forecasting. Trained from Hopsworks Feature View "
+        "karachi_aqi_training version 2."
+    ),
+    feature_view=fv,
+    training_dataset_version=training_dataset_version
+)
+
+print("Registry entry created.")
+print("Model:", hw_model.name)
+print("Version:", hw_model.version)
+
+hw_model.save(
+    MODEL_PATH,
+    keep_original_files=True
+)
+
+print("\nModel successfully registered in Hopsworks.")
 
 print("Model saved:", MODEL_PATH)
 print("Results saved:", RESULTS_PATH)
